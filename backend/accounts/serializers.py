@@ -53,6 +53,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ('username', 'email', 'password', 'password2', 'first_name', 'last_name', 'role')
     
+    def validate_email(self, value):
+        """
+        Validate that email is unique.
+        """
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('این ایمیل قبلاً استفاده شده است')
+        return value
+    
     def validate(self, data):
         """
         Validate that passwords match.
