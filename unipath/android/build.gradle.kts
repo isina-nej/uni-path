@@ -2,6 +2,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // میرور چین برای Gradle وابستگی‌ها
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
+        jcenter()
     }
 }
 
