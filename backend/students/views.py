@@ -99,6 +99,130 @@ class StudentCourseHistoryViewSet(viewsets.ModelViewSet):
             'total_credits': total_credits,
             'gpa': round(gpa, 2),
         })
+    
+    @action(detail=False, methods=['post'])
+    def mark_passed(self, request):
+        """
+        Mark a course as passed with grade.
+        FR-7: Students must be able to toggle the status of a course to "Passed"
+        
+        POST /api/students/history/mark_passed/
+        {
+            "course_id": 1,
+            "semester": "Fall 1402",
+            "grade": "A",
+            "grade_points": 4.0
+        }
+        """
+        if request.user.role != 'student':
+            return Response(
+                {'error': 'فقط دانشجویان می‌توانند دروس را تأیید کنند'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        course_id = request.data.get('course_id')
+        semester = request.data.get('semester', 'Fall 1402')
+        grade = request.data.get('grade', 'A')
+        grade_points = request.data.get('grade_points', 4.0)
+        
+        if not course_id:
+            return Response(
+                {'error': 'course_id الزامی است'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from courses.models import Course
+            course = Course.objects.get(id=course_id)
+            
+            # Create or update history
+            history, created = StudentCourseHistory.objects.get_or_create(
+                student=request.user,
+                course=course,
+                semester=semester,
+                defaults={
+                    'grade': grade,
+                    'grade_points': grade_points,
+                    'credits_earned': course.credits,
+                    'is_passed': True,
+                }
+            )
+            
+            if not created:
+                history.grade = grade
+                history.grade_points = grade_points
+                history.credits_earned = course.credits
+                history.is_passed = True
+                history.save()
+            
+            serializer = StudentCourseHistorySerializer(history)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=False, methods=['post'])
+    def mark_failed(self, request):
+        """
+        Mark a course as failed.
+        
+        POST /api/students/history/mark_failed/
+        {
+            "course_id": 1,
+            "semester": "Fall 1402",
+            "grade": "F",
+            "grade_points": 0.0
+        }
+        """
+        if request.user.role != 'student':
+            return Response(
+                {'error': 'فقط دانشجویان می‌توانند دروس را تأیید کنند'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        course_id = request.data.get('course_id')
+        semester = request.data.get('semester', 'Fall 1402')
+        
+        if not course_id:
+            return Response(
+                {'error': 'course_id الزامی است'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from courses.models import Course
+            course = Course.objects.get(id=course_id)
+            
+            history, created = StudentCourseHistory.objects.get_or_create(
+                student=request.user,
+                course=course,
+                semester=semester,
+                defaults={
+                    'grade': 'F',
+                    'grade_points': 0.0,
+                    'credits_earned': 0,
+                    'is_passed': False,
+                }
+            )
+            
+            if not created:
+                history.grade = 'F'
+                history.grade_points = 0.0
+                history.credits_earned = 0
+                history.is_passed = False
+                history.save()
+            
+            serializer = StudentCourseHistorySerializer(history)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class StudentSelectionViewSet(viewsets.ModelViewSet):

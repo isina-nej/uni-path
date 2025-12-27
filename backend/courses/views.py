@@ -66,6 +66,8 @@ class CourseViewSet(viewsets.ModelViewSet):
     GET    /api/courses/list/{id}/        - Course details with prerequisites
     PUT    /api/courses/list/{id}/        - Update course (admin)
     DELETE /api/courses/list/{id}/        - Delete course (admin)
+    
+    FR-12: HOD must be able to modify the prerequisite structure for their specific department.
     """
     
     queryset = Course.objects.all()
@@ -104,6 +106,134 @@ class CourseViewSet(viewsets.ModelViewSet):
         corequisites = CoRequisite.objects.filter(course=course)
         serializer = CoRequisiteSerializer(corequisites, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['put', 'patch'])
+    def update_prerequisites(self, request, pk=None):
+        """
+        FR-12: Update prerequisites for a course (HOD only).
+        
+        PUT /api/courses/list/{id}/update_prerequisites/
+        {
+            "prerequisites": [1, 2, 3],
+            "corequisites": [4, 5]
+        }
+        """
+        # Check HOD permission
+        if request.user.role not in ['hod', 'admin']:
+            return Response(
+                {'error': 'فقط سرپرستان دپارتمان می‌توانند این کار را انجام دهند'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        course = self.get_object()
+        prerequisites_ids = request.data.get('prerequisites', [])
+        corequisites_ids = request.data.get('corequisites', [])
+        
+        try:
+            # Delete existing prerequisites and corequisites
+            Prerequisite.objects.filter(course=course).delete()
+            CoRequisite.objects.filter(course=course).delete()
+            
+            # Add new prerequisites
+            for prereq_id in prerequisites_ids:
+                prereq_course = Course.objects.get(id=prereq_id)
+                
+                # Check for circular dependency
+                if self._has_circular_dependency(course, prereq_course):
+                    return Response(
+                        {'error': f'وابستگی دایره‌ای تشخیص داده شد با درس {prereq_course.code}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                Prerequisite.objects.create(
+                    course=course,
+                    prerequisite_course=prereq_course,
+                    is_corequisite=False
+                )
+            
+            # Add new corequisites
+            for coreq_id in corequisites_ids:
+                coreq_course = Course.objects.get(id=coreq_id)
+                CoRequisite.objects.create(
+                    course=course,
+                    corequisite_course=coreq_course
+                )
+            
+            # Return updated prerequisites
+            prerequisites = Prerequisite.objects.filter(course=course)
+            corequisites = CoRequisite.objects.filter(course=course)
+            
+            return Response({
+                'course_id': course.id,
+                'course_code': course.code,
+                'prerequisites': PrerequisiteSerializer(prerequisites, many=True).data,
+                'corequisites': CoRequisiteSerializer(corequisites, many=True).data,
+                'message': 'پیش‌نیازها با موفقیت بروزرسانی شدند',
+            }, status=status.HTTP_200_OK)
+        
+        except Course.DoesNotExist:
+            return Response(
+                {'error': 'یکی از دروس پیدا نشد'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def _has_circular_dependency(self, course, new_prereq):
+        """
+        Check if adding new_prereq as a prerequisite for course would create a circular dependency.
+        """
+        visited = set()
+        
+        def dfs(current):
+            if current.id in visited:
+                return False
+            if current.id == course.id:
+                return True
+            visited.add(current.id)
+            
+            dependents = Prerequisite.objects.filter(
+                prerequisite_course=current,
+                is_corequisite=False
+            ).values_list('course_id', flat=True)
+            
+            for dependent_id in dependents:
+                dependent = Course.objects.get(id=dependent_id)
+                if dfs(dependent):
+                    return True
+            
+            return False
+        
+    
+    def _has_circular_dependency(self, course, new_prereq):
+        """
+        Check if adding new_prereq as a prerequisite for course would create a circular dependency.
+        """
+        visited = set()
+        
+        def dfs(current):
+            if current.id in visited:
+                return False
+            if current.id == course.id:
+                return True
+            visited.add(current.id)
+            
+            dependents = Prerequisite.objects.filter(
+                prerequisite_course=current,
+                is_corequisite=False
+            ).values_list('course_id', flat=True)
+            
+            for dependent_id in dependents:
+                dependent = Course.objects.get(id=dependent_id)
+                if dfs(dependent):
+                    return True
+            
+            return False
+        
+        return dfs(new_prereq)
 
 
 class PrerequisiteViewSet(viewsets.ModelViewSet):
@@ -127,6 +257,7 @@ class PrerequisiteViewSet(viewsets.ModelViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         
+
         if serializer.is_valid():
             course = serializer.validated_data['course']
             prerequisite = serializer.validated_data['prerequisite_course']

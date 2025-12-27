@@ -3,10 +3,12 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from . import views
+from .views_grades import GradeViewSet
 
 # Create router
 router = DefaultRouter()
 router.register(r'profile', views.UserProfileViewSet, basename='profile')
+router.register(r'grades', GradeViewSet, basename='grades')
 
 app_name = 'accounts'
 
