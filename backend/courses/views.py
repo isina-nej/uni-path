@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django_filters.rest_framework import DjangoFilterBackend
+from django.shortcuts import get_object_or_404
 
 from .models import DegreeChart, Course, ChartCourse, Prerequisite, CoRequisite
 from .serializers import (
@@ -14,7 +15,8 @@ from .serializers import (
     PrerequisiteSerializer,
     CoRequisiteSerializer,
 )
-from accounts.permissions import IsAdmin, IsAdminOrHOD, IsAdminOrReadOnly
+from accounts.permissions import IsAdmin, IsAdminOrHOD, IsAdminOrReadOnly, IsStudent
+from .recommendations import RecommendationEngine
 
 
 class DegreeChartViewSet(viewsets.ModelViewSet):
@@ -175,3 +177,111 @@ class CoRequisiteViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class RecommendationViewSet(viewsets.ViewSet):
+    """
+    ViewSet for course recommendations.
+    
+    POST   /api/courses/recommendations/   - Get recommendations for student
+    """
+    
+    permission_classes = [IsAuthenticated, IsStudent]
+    
+    @action(detail=False, methods=['post'])
+    def recommend(self, request):
+        """
+        Get course recommendations for the student.
+        
+        POST /api/courses/recommendations/recommend/
+        {
+            "degree_chart_id": 1,
+            "semester": "Spring 1403",
+            "limit": 10
+        }
+        
+        Returns:
+            {
+                "success": true,
+                "semester": "Spring 1403",
+                "recommendations": [
+                    {
+                        "id": 1,
+                        "code": "CS101",
+                        "name": "مقدمه برنامه‌نویسی",
+                        "credits": 3,
+                        "unit_type": "theoretical",
+                        "instructor": "دکتر احمدی",
+                        "importance_score": 5,
+                        "description": "...",
+                        "start_time": "08:00:00",
+                        "end_time": "09:30:00"
+                    }
+                ]
+            }
+        """
+        
+        # تأیید اینکه کاربر دانشجو است
+        if request.user.role != 'student':
+            return Response(
+                {'error': 'فقط دانشجویان می‌توانند توصیه‌ها دریافت کنند'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # دریافت پارامترهای ورودی
+        degree_chart_id = request.data.get('degree_chart_id')
+        semester = request.data.get('semester', 'Spring 1403')
+        limit = int(request.data.get('limit', 10))
+        
+        # اعتبارسنجی
+        if not degree_chart_id:
+            return Response(
+                {'error': 'degree_chart_id الزامی است'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # دریافت نمودار درجات
+        degree_chart = get_object_or_404(DegreeChart, id=degree_chart_id)
+        
+        try:
+            # ایجاد موتور توصیه‌ها
+            engine = RecommendationEngine(request.user, degree_chart)
+            
+            # دریافت توصیه‌ها
+            recommendations = engine.get_recommendations(semester, limit)
+            
+            return Response({
+                'success': True,
+                'semester': semester,
+                'degree_chart': {
+                    'id': degree_chart.id,
+                    'name': degree_chart.name,
+                    'code': degree_chart.code,
+                },
+                'total_recommendations': len(recommendations),
+                'recommendations': recommendations,
+            })
+        
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=False, methods=['get'])
+    def help(self, request):
+        """
+        لیست پیامهای API توصیه‌ها
+        GET /api/courses/recommendations/help/
+        """
+        return Response({
+            'endpoints': {
+                'recommend': {
+                    'method': 'POST',
+                    'path': '/api/courses/recommendations/recommend/',
+                    'description': 'دریافت توصیه‌های دروس برای دانشجو',
+                    'required_fields': ['degree_chart_id'],
+                    'optional_fields': ['semester', 'limit'],
+                }
+            }
+        })

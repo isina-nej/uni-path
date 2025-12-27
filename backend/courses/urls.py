@@ -9,6 +9,7 @@ router.register(r'charts', views.DegreeChartViewSet, basename='chart')
 router.register(r'list', views.CourseViewSet, basename='course')
 router.register(r'prerequisites', views.PrerequisiteViewSet, basename='prerequisite')
 router.register(r'corequisites', views.CoRequisiteViewSet, basename='corequisite')
+router.register(r'recommendations', views.RecommendationViewSet, basename='recommendation')
 
 app_name = 'courses'
 
