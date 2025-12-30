@@ -25,7 +25,8 @@ SECRET_KEY = 'django-insecure-n%7apbdsn*8sz83#ihoq3a+3+#((dgxikr-)3%-o4ed=dyxldj
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# Allow access from all network interfaces for mobile testing
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -127,8 +128,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8080",
+    "http://127.0.0.1:5000",  # Mock API Server
 ]
 
+CORS_ALLOW_ALL_ORIGINS = True  # For mobile testing on LAN
 CORS_ALLOW_CREDENTIALS = True
 
 

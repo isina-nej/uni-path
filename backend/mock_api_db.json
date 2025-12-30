@@ -1,0 +1,117 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "username": "testuser",
+      "email": "test@example.com",
+      "first_name": "تست",
+      "last_name": "کاربر",
+      "is_active": true,
+      "role": "student"
+    },
+    {
+      "id": 2,
+      "username": "instructor",
+      "email": "instructor@example.com",
+      "first_name": "مدرس",
+      "last_name": "تست",
+      "is_active": true,
+      "role": "instructor"
+    }
+  ],
+  "auth": {
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjogMSwgInVzZXJuYW1lIjogInRlc3R1c2VyIn0.test_token",
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjogMSwgInVzZXJuYW1lIjogInRlc3R1c2VyIn0.refresh_token"
+  },
+  "courses": [
+    {
+      "id": 1,
+      "code": "CS101",
+      "title": "مقدمه‌ای به برنامه‌نویسی",
+      "description": "یک دوره مقدماتی برای یادگیری برنامه‌نویسی",
+      "instructor": "مدرس تست",
+      "credits": 3,
+      "semester": "پاییز 1403",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "code": "MATH102",
+      "title": "حساب دیفرانسیل و انتگرال",
+      "description": "دوره ریاضیات پیشرفته",
+      "instructor": "مدرس تست",
+      "credits": 4,
+      "semester": "پاییز 1403",
+      "status": "active"
+    },
+    {
+      "id": 3,
+      "code": "ENG103",
+      "title": "زبان انگلیسی",
+      "description": "دوره یادگیری زبان انگلیسی",
+      "instructor": "مدرس تست",
+      "credits": 2,
+      "semester": "پاییز 1403",
+      "status": "active"
+    }
+  ],
+  "enrollments": [
+    {
+      "id": 1,
+      "student": 1,
+      "course": 1,
+      "enrolled_at": "2024-09-01T10:00:00Z",
+      "status": "active"
+    },
+    {
+      "id": 2,
+      "student": 1,
+      "course": 2,
+      "enrolled_at": "2024-09-01T10:00:00Z",
+      "status": "active"
+    }
+  ],
+  "grades": [
+    {
+      "id": 1,
+      "student": 1,
+      "course": 1,
+      "midterm": 18,
+      "final": 19,
+      "total": 18.5,
+      "grade": "A",
+      "semester": "پاییز 1403"
+    },
+    {
+      "id": 2,
+      "student": 1,
+      "course": 2,
+      "midterm": 16,
+      "final": 17,
+      "total": 16.5,
+      "grade": "B+",
+      "semester": "پاییز 1403"
+    }
+  ],
+  "recommendations": [
+    {
+      "id": 1,
+      "student": 1,
+      "recommended_courses": [
+        {
+          "id": 3,
+          "code": "ENG103",
+          "title": "زبان انگلیسی",
+          "reason": "بر اساس عملکرد شما در دروس قبلی"
+        }
+      ],
+      "reason": "دانشجوی خوب"
+    }
+  ],
+  "statistics": {
+    "gpa": 3.8,
+    "total_credits": 7,
+    "completed_credits": 7,
+    "enrollment_count": 2
+  }
+}
