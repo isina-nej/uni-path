@@ -6,7 +6,6 @@ from .views_chart import DegreeChartViewSet
 
 # Create router
 router = DefaultRouter()
-router.register(r'charts', views.DegreeChartViewSet, basename='chart')
 router.register(r'degrees', DegreeChartViewSet, basename='degree-chart')
 router.register(r'list', views.CourseViewSet, basename='course')
 router.register(r'prerequisites', views.PrerequisiteViewSet, basename='prerequisite')
