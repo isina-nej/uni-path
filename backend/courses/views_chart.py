@@ -10,13 +10,16 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
+from django.contrib.auth import get_user_model
 
 from courses.models import ChartSchema, ChartNode, Course, CourseRequirement
-from accounts.models import StudentProfile, StudentCourse
+from students.models import StudentCourseHistory
 from .serializers_chart import (
     ChartSchemaDetailSerializer,
     CourseRecommendationSerializer,
 )
+
+User = get_user_model()
 
 
 class DegreeChartViewSet(viewsets.ViewSet):
@@ -37,14 +40,14 @@ class DegreeChartViewSet(viewsets.ViewSet):
         
         # Get student profile
         try:
-            student_profile = user.studentprofile
+            profile = user.profile
         except:
             return Response(
                 {"error": "پروفایل دانشجویی یافت نشد"},
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        student_id = student_profile.student_id
+        student_id = profile.student_number
         if not student_id or len(student_id) < 5:
             return Response(
                 {"error": "شماره دانشجویی نامعتبر است"},
@@ -101,9 +104,10 @@ class DegreeChartViewSet(viewsets.ViewSet):
             )
         
         # Get passed courses for this student
-        passed_courses = StudentCourse.objects.filter(
-            student=student_profile,
-            is_passed=True
+        # Check StudentCourseHistory for passed courses (grade != 'F' and != 'W')
+        passed_courses = StudentCourseHistory.objects.filter(
+            student=user,
+            grade__in=['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'D']
         ).values_list('course_id', flat=True)
         
         # Serialize
@@ -111,7 +115,8 @@ class DegreeChartViewSet(viewsets.ViewSet):
             chart,
             context={
                 'passed_courses': list(passed_courses),
-                'completed_semesters': student_profile.completed_semesters or 0,
+                'completed_semesters': 0,  # TODO: Calculate from StudentCourseHistory
+                'request': request,
             }
         )
         
@@ -132,23 +137,23 @@ class DegreeChartViewSet(viewsets.ViewSet):
         
         # Get student profile
         try:
-            student_profile = user.studentprofile
+            profile = user.profile
         except:
             return Response(
                 {"error": "پروفایل دانشجویی یافت نشد"},
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get passed courses
+        # Get passed courses from StudentCourseHistory
         passed_courses = set(
-            StudentCourse.objects.filter(
-                student=student_profile,
-                is_passed=True
+            StudentCourseHistory.objects.filter(
+                student=user,
+                grade__in=['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'D']
             ).values_list('course_id', flat=True)
         )
         
         # Get student's chart
-        student_id = student_profile.student_id
+        student_id = profile.student_number
         if not student_id or len(student_id) < 5:
             return Response(
                 {"error": "شماره دانشجویی نامعتبر است"},
@@ -193,8 +198,12 @@ class DegreeChartViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Next semester
-        next_semester = (student_profile.completed_semesters or 0) + 1
+        # Next semester (calculate from passed courses in StudentCourseHistory)
+        completed_semesters = StudentCourseHistory.objects.filter(
+            student=user
+        ).values('semester').distinct().count()
+        next_semester = (completed_semesters or 0) + 1
+        
         if next_semester > 8:
             return Response({
                 "next_semester": next_semester,

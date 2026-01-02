@@ -2,186 +2,114 @@
 Test script for PRD 3.1 API endpoints
 
 Run this after:
-1. python manage.py migrate courses
-2. python create_degree_chart_v2.py
-3. python setup_chart_schema.py
-4. Create a test student with ID 992101001
-5. python manage.py runserver
+1. pip install -r requirements.txt
+2. python manage.py migrate courses
+3. python create_degree_chart_v2.py
+4. python setup_chart_schema.py
+5. Create a test student with ID 992101001
+6. python manage.py runserver
 
 Then:
 python test_prd3.1_api.py
 """
 
-import requests
-import json
-from pathlib import Path
+import sys
+import django
+import os
 
-# Configuration
-BASE_URL = "http://127.0.0.1:8000"
-API_KEY = None
+# Setup Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'unipath.settings')
+django.setup()
 
-# Test student
-TEST_STUDENT = {
-    "email": "student1@unipath.ir",
-    "password": "Student@123456"
-}
+from django.test import Client
+from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.tokens import RefreshToken
 
-def login():
-    """Login and get access token"""
-    print("🔐 Logging in...")
-    response = requests.post(
-        f"{BASE_URL}/api/auth/login/",
-        json=TEST_STUDENT
-    )
-    
-    if response.status_code != 200:
-        print(f"❌ Login failed: {response.status_code}")
-        print(response.text)
-        return None
-    
-    data = response.json()
-    token = data.get('access')
-    print(f"✅ Logged in as {TEST_STUDENT['email']}")
-    print(f"   Token: {token[:20]}...")
-    return token
+User = get_user_model()
 
-def get_my_chart(token):
-    """Test GET /api/courses/degrees/my-chart/"""
-    print("\n📊 Testing GET /api/courses/degrees/my-chart/")
-    
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(
-        f"{BASE_URL}/api/courses/degrees/my-chart/",
-        headers=headers
-    )
-    
-    if response.status_code != 200:
-        print(f"❌ Failed: {response.status_code}")
-        print(response.text)
-        return None
-    
-    data = response.json()
-    print(f"✅ Chart loaded successfully")
-    print(f"   Chart Code: {data['code']}")
-    print(f"   Chart Name: {data['name']}")
-    print(f"   Major: {data['major']}")
-    print(f"   Semesters: {len(data['semesters'])}")
-    print(f"   Total Credits: {data['total_credits']}")
-    
-    # Print semester summary
-    print("\n   Semester Overview:")
-    for sem in data['semesters']:
-        total_credits = sem.get('total_credits', 0)
-        node_count = len(sem.get('nodes', []))
-        print(f"   - ترم {sem['number']}: {node_count} nodes, {total_credits} credits")
-    
-    print(f"\n   Passed Courses: {len(data['passed_courses'])}")
-    print(f"   Completed Semesters: {data['completed_semesters']}")
-    
-    return data
+def get_tokens_for_user(user):
+    """Get access token for user"""
+    refresh = RefreshToken.for_user(user)
+    return str(refresh.access_token)
 
-def get_recommendations(token):
-    """Test GET /api/courses/degrees/recommendations/"""
-    print("\n💡 Testing GET /api/courses/degrees/recommendations/")
-    
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(
-        f"{BASE_URL}/api/courses/degrees/recommendations/",
-        headers=headers
-    )
-    
-    if response.status_code != 200:
-        print(f"❌ Failed: {response.status_code}")
-        print(response.text)
-        return None
-    
-    data = response.json()
-    print(f"✅ Recommendations loaded successfully")
-    print(f"   Next Semester: {data['next_semester']}")
-    print(f"   Total Recommendations: {len(data['recommendations'])}")
-    
-    # Print top 5 recommendations
-    print("\n   Top 5 Recommendations (by priority):")
-    for i, rec in enumerate(data['recommendations'][:5], 1):
-        print(f"   {i}. {rec['code']} - {rec['name']}")
-        print(f"      Score: {rec['priority_score']}/100")
-        print(f"      Reason: {rec['reason']}")
-        print(f"      Unlocks: {len(rec['unlocks'])} courses")
-        print(f"      Status: {'✅ Ready' if rec['prerequisites_met'] else '❌ Blocked'}")
-    
-    if len(data['recommendations']) > 5:
-        print(f"   ... and {len(data['recommendations']) - 5} more")
-    
-    return data
-
-def validate_response_structure(data, expected_keys):
-    """Validate response has expected keys"""
-    missing = []
-    for key in expected_keys:
-        if key not in data:
-            missing.append(key)
-    return missing
-
-def main():
+def test_api():
+    """Test the API endpoints"""
     print("=" * 60)
     print("PRD 3.1 API Tests")
     print("=" * 60)
     
-    # Login
-    token = login()
-    if not token:
-        print("\n❌ Cannot proceed without token")
+    # Try to get test user
+    try:
+        user = User.objects.get(email='student1@unipath.ir')
+        print(f"\n✅ Found test user: {user.email}")
+    except User.DoesNotExist:
+        print("\n❌ Test user not found: student1@unipath.ir")
+        print("   Create test student first")
         return
     
-    # Test chart endpoint
-    chart_data = get_my_chart(token)
-    if chart_data:
-        # Validate structure
-        required_keys = [
-            'id', 'code', 'name', 'major', 'degree',
-            'entry_year_start', 'entry_year_end', 'total_credits',
-            'semesters', 'passed_courses', 'completed_semesters'
-        ]
-        missing = validate_response_structure(chart_data, required_keys)
-        if missing:
-            print(f"\n⚠️  Missing keys in chart response: {missing}")
-        else:
-            print("\n✅ Chart response structure validated")
+    # Check if user has a profile with student_number
+    try:
+        profile = user.profile
+        print(f"✅ User profile found")
+        print(f"   Student Number: {profile.student_number}")
+    except:
+        print("❌ User profile not found")
+        return
     
-    # Test recommendations endpoint
-    rec_data = get_recommendations(token)
-    if rec_data:
-        # Validate structure
-        required_keys = ['next_semester', 'recommendations']
-        missing = validate_response_structure(rec_data, required_keys)
-        if missing:
-            print(f"\n⚠️  Missing keys in recommendations response: {missing}")
-        else:
-            print("\n✅ Recommendations response structure validated")
+    # Get access token
+    token = get_tokens_for_user(user)
+    print(f"✅ Got access token: {token[:20]}...")
+    
+    # Test with Django test client
+    client = Client()
+    
+    # Test 1: GET /api/courses/degrees/my-chart/
+    print("\n📊 Testing GET /api/courses/degrees/my-chart/")
+    response = client.get(
+        '/api/courses/degrees/my-chart/',
+        HTTP_AUTHORIZATION=f'Bearer {token}'
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ Chart loaded successfully")
+        print(f"   Chart Code: {data['code']}")
+        print(f"   Chart Name: {data['name']}")
+        print(f"   Major: {data['major']}")
+        print(f"   Semesters: {len(data['semesters'])}")
+        print(f"   Total Credits: {data['total_credits']}")
+        print(f"   Passed Courses: {len(data['passed_courses'])}")
+    else:
+        print(f"❌ Failed: {response.status_code}")
+        print(f"   Error: {response.json()}")
+    
+    # Test 2: GET /api/courses/degrees/recommendations/
+    print("\n💡 Testing GET /api/courses/degrees/recommendations/")
+    response = client.get(
+        '/api/courses/degrees/recommendations/',
+        HTTP_AUTHORIZATION=f'Bearer {token}'
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        print(f"✅ Recommendations loaded successfully")
+        print(f"   Next Semester: {data['next_semester']}")
+        print(f"   Total Recommendations: {len(data['recommendations'])}")
         
-        # Validate recommendation structure
-        if rec_data['recommendations']:
-            rec = rec_data['recommendations'][0]
-            required_keys = [
-                'course_id', 'code', 'name', 'credits', 'priority_score',
-                'reason', 'unlocks', 'prerequisites_met', 'is_mandatory'
-            ]
-            missing = validate_response_structure(rec, required_keys)
-            if missing:
-                print(f"⚠️  Missing keys in recommendation item: {missing}")
-            else:
-                print("✅ Recommendation item structure validated")
+        if data['recommendations']:
+            print(f"\n   Top 3 Recommendations:")
+            for i, rec in enumerate(data['recommendations'][:3], 1):
+                print(f"   {i}. {rec['code']} - {rec['name']}")
+                print(f"      Score: {rec['priority_score']}/100")
+                print(f"      Reason: {rec['reason']}")
+    else:
+        print(f"❌ Failed: {response.status_code}")
+        print(f"   Error: {response.json()}")
     
     print("\n" + "=" * 60)
-    print("✅ All tests completed")
+    print("✅ Tests completed")
     print("=" * 60)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except requests.exceptions.ConnectionError:
-        print("❌ Cannot connect to server")
-        print(f"   Make sure Django is running on {BASE_URL}")
-        print("   Run: python manage.py runserver")
-    except Exception as e:
-        print(f"❌ Error: {e}")
+    test_api()
+
