@@ -206,12 +206,21 @@ def generate_student_id(entry_year, level, sequence_num):
     entry_year: 1399, 1400, etc.
     level: 12 (bachelor), 13 (masters), 14 (phd)
     sequence_num: 1, 2, 3, ...
+    
+    Format:
+    - Before 1400: xxyyzzznnn (2-digit year like 99 for 1399)
+    - 1400 and after: xxxyyzzznnn (3-digit year like 400 for 1400, 401 for 1401)
     """
-    # Get last 2-3 digits of entry year
-    year_code = str(entry_year)[-2:]  # "40" for 1400, "99" for 1399
     level_code = str(level)  # "12", "13", "14"
     field_code = '102'  # Computer Engineering
     seq = str(sequence_num).zfill(4)  # Pad to 4 digits
+    
+    if entry_year >= 1400:
+        # 3-digit year code: last 3 digits of year
+        year_code = str(entry_year)[-3:]  # "400" for 1400, "401" for 1401
+    else:
+        # 2-digit year code: last 2 digits of year
+        year_code = str(entry_year)[-2:]  # "99" for 1399, "98" for 1398
     
     return f"{year_code}{level_code}{field_code}{seq}"
 
