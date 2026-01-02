@@ -89,6 +89,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom JWT token serializer with additional user information.
+    Accepts both 'username' and 'email' as login identifier.
     """
     
     @classmethod
@@ -107,7 +108,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         """
         Validate credentials and return user info along with token.
+        Converts email input to username automatically.
         """
+        # If 'username' field contains an email, try to find user by email first
+        username_input = attrs.get('username', '')
+        if '@' in username_input:
+            try:
+                user = User.objects.get(email=username_input)
+                attrs['username'] = user.username
+            except User.DoesNotExist:
+                pass  # Fall back to normal validation
+        
         data = super().validate(attrs)
         
         # Add user information to response
