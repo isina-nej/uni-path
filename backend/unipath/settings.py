@@ -28,7 +28,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-n%7apbdsn*8sz83#ihoq3
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'isinanej.pythonanywhere.com',
+    'www.isinanej.pythonanywhere.com',
+    'unipath.nodia.ir',
+    'www.unipath.nodia.ir',
+]
 
 
 # Application definition
